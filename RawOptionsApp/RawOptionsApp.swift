@@ -1,5 +1,6 @@
 import AppKit
 import CoreImage
+import ImageIO
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -15,64 +16,97 @@ struct RawFile: Identifiable, Hashable {
     let url: URL
 
     var name: String { url.lastPathComponent }
-    var detail: String { url.deletingLastPathComponent().path }
+    var folder: String { url.deletingLastPathComponent().path }
     var isDNG: Bool { url.pathExtension.lowercased() == "dng" }
 }
 
-struct RawOption: Identifiable {
-    enum Value {
-        case float(Float)
-        case bool(Bool)
-        case point(CGPoint)
-        case text(String)
-        case unavailable
+struct RawSettings {
+    var scaleFactor: Float = 1
+    var draftModeEnabled = false
+    var exposure: Float = 0
+    var baselineExposure: Float = 0
+    var shadowBias: Float = 0
+    var boostAmount: Float = 1
+    var boostShadowAmount: Float = 1
+    var highlightRecoveryEnabled = false
+    var gamutMappingEnabled = true
+    var lensCorrectionEnabled = false
+    var luminanceNoiseReductionAmount: Float = 0
+    var colorNoiseReductionAmount: Float = 0
+    var sharpnessAmount: Float = 0
+    var contrastAmount: Float = 0
+    var detailAmount: Float = 0
+    var moireReductionAmount: Float = 0
+    var despeckleAmount: Float = 0
+    var localToneMapAmount: Float = 0
+    var extendedDynamicRangeAmount: Float = 0
+    var neutralTemperature: Float = 6500
+    var neutralTint: Float = 0
 
-        var display: String {
-            switch self {
-            case .float(let value):
-                if abs(value) >= 100 {
-                    return String(format: "%.0f", value)
-                }
-                return String(format: "%.3f", value)
-            case .bool(let value):
-                return value ? "Oui" : "Non"
-            case .point(let value):
-                return String(format: "%.4f, %.4f", value.x, value.y)
-            case .text(let value):
-                return value
-            case .unavailable:
-                return "Indisponible"
-            }
-        }
+    init() {}
+
+    init(filter: CIRAWFilter) {
+        scaleFactor = filter.scaleFactor
+        draftModeEnabled = filter.isDraftModeEnabled
+        exposure = filter.exposure
+        baselineExposure = filter.baselineExposure
+        shadowBias = filter.shadowBias
+        boostAmount = filter.boostAmount
+        boostShadowAmount = filter.boostShadowAmount
+        highlightRecoveryEnabled = filter.isHighlightRecoveryEnabled
+        gamutMappingEnabled = filter.isGamutMappingEnabled
+        lensCorrectionEnabled = filter.isLensCorrectionEnabled
+        luminanceNoiseReductionAmount = filter.luminanceNoiseReductionAmount
+        colorNoiseReductionAmount = filter.colorNoiseReductionAmount
+        sharpnessAmount = filter.sharpnessAmount
+        contrastAmount = filter.contrastAmount
+        detailAmount = filter.detailAmount
+        moireReductionAmount = filter.moireReductionAmount
+        despeckleAmount = filter.despeckleAmount
+        localToneMapAmount = filter.localToneMapAmount
+        extendedDynamicRangeAmount = filter.extendedDynamicRangeAmount
+        neutralTemperature = filter.neutralTemperature
+        neutralTint = filter.neutralTint
     }
+}
 
-    let id: String
-    let name: String
-    let note: String
-    let value: Value
-    let isFunctional: Bool
+struct RawSupport {
+    var decoder = false
+    var highlightRecovery = false
+    var lensCorrection = false
+    var luminanceNoiseReduction = false
+    var colorNoiseReduction = false
+    var sharpness = false
+    var contrast = false
+    var detail = false
+    var moireReduction = false
+    var despeckle = false
+    var localToneMap = false
 }
 
 final class RawOptionsModel: ObservableObject {
     @Published var files: [RawFile] = []
     @Published var selectedFileID: RawFile.ID?
-    @Published var mode: RawMode = .raw8
+    @Published var mode: RawMode = .raw9
+    @Published var settings = RawSettings()
+    @Published var support = RawSupport()
     @Published var isDropTargeted = false
-    @Published var options: [RawOption] = []
-    @Published var statusText = "Dépose des fichiers RAW ou DNG"
+    @Published var statusText = "Drop RAW or DNG files"
     @Published var metadataText = ""
+    @Published var supportedRaw9Cameras: [String] = []
+    @Published var supportedRaw9DNGCameras: [String] = []
 
     private let rawExtensions: Set<String> = [
         "3fr", "arw", "cr2", "cr3", "dng", "erf", "fff", "iiq", "kdc",
         "mos", "mrw", "nef", "nrw", "orf", "pef", "raf", "raw", "rw2", "srw"
     ]
 
-    var selectedFile: RawFile? {
-        files.first { $0.id == selectedFileID }
+    init() {
+        loadRaw9CameraSupport()
     }
 
-    var shouldShowDefaults: Bool {
-        files.count == 1
+    var selectedFile: RawFile? {
+        files.first { $0.id == selectedFileID }
     }
 
     func addDroppedProviders(_ providers: [NSItemProvider]) -> Bool {
@@ -104,52 +138,77 @@ final class RawOptionsModel: ObservableObject {
         guard let file = selectedFile else { return }
         files.removeAll { $0.id == file.id }
         selectedFileID = files.first?.id
-        refreshOptions()
+        loadDefaultsForSelection()
     }
 
     func clearFiles() {
         files = []
         selectedFileID = nil
-        refreshOptions()
+        loadDefaultsForSelection()
     }
 
-    func refreshOptions() {
+    func loadDefaultsForSelection() {
         guard let file = selectedFile else {
-            options = []
-            statusText = "Dépose des fichiers RAW ou DNG"
+            support = RawSupport()
+            settings = RawSettings()
+            statusText = "Drop RAW or DNG files"
             metadataText = ""
             return
         }
 
-        guard let filter = CIRAWFilter(imageURL: file.url) else {
-            options = []
-            statusText = "Core Image ne peut pas ouvrir ce fichier RAW."
+        guard let filter = configuredFilter(for: file, applyingSettings: false) else {
+            support = RawSupport()
+            settings = RawSettings()
+            statusText = "Core Image cannot open this RAW file."
             metadataText = file.name
             return
         }
 
-        let decoder = decoderVersion(for: file, mode: mode)
-        let supportedVersions = filter.supportedDecoderVersions
         metadataText = metadataSummary(for: filter, file: file)
+        support = supportSummary(for: filter)
 
-        guard supportedVersions.contains(decoder) else {
-            options = unavailableOptions()
-            let versions = supportedVersions.map(\.rawValue).joined(separator: ", ")
-            statusText = "\(mode.rawValue) indisponible pour \(file.name). Versions: \(versions)"
+        guard support.decoder else {
+            settings = RawSettings()
+            let versions = filter.supportedDecoderVersions.map(\.rawValue).joined(separator: ", ")
+            statusText = "\(mode.rawValue) is not available for \(file.name). Available: \(versions)"
             return
         }
 
-        filter.decoderVersion = decoder
-        options = buildOptions(from: filter)
-        statusText = shouldShowDefaults
-            ? "Valeurs par défaut détectées pour \(mode.rawValue)"
-            : "\(files.count) fichiers importés. Sélectionne un fichier pour inspecter ses valeurs."
+        settings = RawSettings(filter: filter)
+        statusText = "Default \(mode.rawValue) settings loaded"
+    }
+
+    func resetToDefaults() {
+        loadDefaultsForSelection()
+    }
+
+    func exportSelectedFile() {
+        guard let file = selectedFile else {
+            statusText = "Select a RAW file before exporting."
+            return
+        }
+        guard support.decoder else {
+            statusText = "\(mode.rawValue) is not available for this file."
+            return
+        }
+
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.jpeg]
+        panel.nameFieldStringValue = "\(file.url.deletingPathExtension().lastPathComponent)-\(mode.rawValue.replacingOccurrences(of: " ", with: "").lowercased()).jpg"
+        if panel.runModal() == .OK, let destination = panel.url {
+            do {
+                try export(file: file, to: destination)
+                statusText = "Exported \(destination.lastPathComponent)"
+            } catch {
+                statusText = "Export failed: \(error.localizedDescription)"
+            }
+        }
     }
 
     private func addURL(_ url: URL) {
         let standardized = url.standardizedFileURL
         guard rawExtensions.contains(standardized.pathExtension.lowercased()) else {
-            statusText = "Format ignoré: \(standardized.lastPathComponent)"
+            statusText = "Ignored unsupported file: \(standardized.lastPathComponent)"
             return
         }
         guard !files.contains(where: { $0.url == standardized }) else {
@@ -162,10 +221,19 @@ final class RawOptionsModel: ObservableObject {
         if selectedFileID == nil || files.count == 1 {
             selectedFileID = file.id
         }
-        refreshOptions()
+        loadDefaultsForSelection()
     }
 
-    private func decoderVersion(for file: RawFile, mode: RawMode) -> CIRAWDecoderVersion {
+    private func loadRaw9CameraSupport() {
+        supportedRaw9Cameras = CIRAWFilter.supportedCameraModels(with: .version9).sorted {
+            $0.localizedStandardCompare($1) == .orderedAscending
+        }
+        supportedRaw9DNGCameras = CIRAWFilter.supportedCameraModels(with: .version9DNG).sorted {
+            $0.localizedStandardCompare($1) == .orderedAscending
+        }
+    }
+
+    private func decoderVersion(for file: RawFile) -> CIRAWDecoderVersion {
         switch (mode, file.isDNG) {
         case (.raw8, true):
             return .version8DNG
@@ -178,74 +246,120 @@ final class RawOptionsModel: ObservableObject {
         }
     }
 
+    private func configuredFilter(for file: RawFile, applyingSettings: Bool) -> CIRAWFilter? {
+        guard let filter = CIRAWFilter(imageURL: file.url) else { return nil }
+        let decoder = decoderVersion(for: file)
+        if filter.supportedDecoderVersions.contains(decoder) {
+            filter.decoderVersion = decoder
+        }
+        filter.scaleFactor = applyingSettings ? settings.scaleFactor : 1
+        filter.isDraftModeEnabled = applyingSettings ? settings.draftModeEnabled : false
+
+        if applyingSettings {
+            apply(settings: settings, support: support, to: filter)
+        }
+        return filter
+    }
+
+    private func apply(settings: RawSettings, support: RawSupport, to filter: CIRAWFilter) {
+        filter.exposure = settings.exposure
+        filter.baselineExposure = settings.baselineExposure
+        filter.shadowBias = settings.shadowBias
+        filter.boostAmount = settings.boostAmount
+        filter.boostShadowAmount = settings.boostShadowAmount
+        filter.isGamutMappingEnabled = settings.gamutMappingEnabled
+        filter.extendedDynamicRangeAmount = settings.extendedDynamicRangeAmount
+        filter.neutralTemperature = settings.neutralTemperature
+        filter.neutralTint = settings.neutralTint
+
+        if support.highlightRecovery {
+            filter.isHighlightRecoveryEnabled = settings.highlightRecoveryEnabled
+        }
+        if support.lensCorrection {
+            filter.isLensCorrectionEnabled = settings.lensCorrectionEnabled
+        }
+        if support.luminanceNoiseReduction {
+            filter.luminanceNoiseReductionAmount = settings.luminanceNoiseReductionAmount
+        }
+        if support.colorNoiseReduction {
+            filter.colorNoiseReductionAmount = settings.colorNoiseReductionAmount
+        }
+        if support.sharpness {
+            filter.sharpnessAmount = settings.sharpnessAmount
+        }
+        if support.contrast {
+            filter.contrastAmount = settings.contrastAmount
+        }
+        if support.detail {
+            filter.detailAmount = settings.detailAmount
+        }
+        if support.moireReduction {
+            filter.moireReductionAmount = settings.moireReductionAmount
+        }
+        if support.despeckle {
+            filter.despeckleAmount = settings.despeckleAmount
+        }
+        if support.localToneMap {
+            filter.localToneMapAmount = settings.localToneMapAmount
+        }
+    }
+
+    private func supportSummary(for filter: CIRAWFilter) -> RawSupport {
+        let decoder = selectedFile.map { decoderVersion(for: $0) }
+        return RawSupport(
+            decoder: decoder.map { filter.supportedDecoderVersions.contains($0) } ?? false,
+            highlightRecovery: filter.isHighlightRecoverySupported,
+            lensCorrection: filter.isLensCorrectionSupported,
+            luminanceNoiseReduction: filter.isLuminanceNoiseReductionSupported,
+            colorNoiseReduction: filter.isColorNoiseReductionSupported,
+            sharpness: filter.isSharpnessSupported,
+            contrast: filter.isContrastSupported,
+            detail: filter.isDetailSupported,
+            moireReduction: filter.isMoireReductionSupported,
+            despeckle: filter.isDespeckleSupported,
+            localToneMap: filter.isLocalToneMapSupported
+        )
+    }
+
     private func metadataSummary(for filter: CIRAWFilter, file: RawFile) -> String {
         let tiff = filter.properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any]
-        let model = tiff?[kCGImagePropertyTIFFModel as String] as? String ?? "Modèle inconnu"
+        let model = tiff?[kCGImagePropertyTIFFModel as String] as? String ?? "Unknown camera"
         let width = Int(filter.nativeSize.width)
         let height = Int(filter.nativeSize.height)
         return "\(file.name) · \(model) · \(width) x \(height)"
     }
 
-    private func buildOptions(from filter: CIRAWFilter) -> [RawOption] {
-        [
-            RawOption(id: "decoderVersion", name: "Décodeur", note: "Version Core Image utilisée", value: .text(filter.decoderVersion.rawValue), isFunctional: true),
-            RawOption(id: "scaleFactor", name: "Échelle", note: "0 à 1", value: .float(filter.scaleFactor), isFunctional: true),
-            RawOption(id: "draftMode", name: "Mode brouillon", note: "Décodage plus rapide", value: .bool(filter.isDraftModeEnabled), isFunctional: true),
-            RawOption(id: "exposure", name: "Exposition", note: "EV appliqué au RAW", value: .float(filter.exposure), isFunctional: true),
-            RawOption(id: "baselineExposure", name: "Baseline exposure", note: "Défaut dépendant du fichier", value: .float(filter.baselineExposure), isFunctional: true),
-            RawOption(id: "shadowBias", name: "Shadow bias", note: "Correction des ombres", value: .float(filter.shadowBias), isFunctional: true),
-            RawOption(id: "boostAmount", name: "Boost", note: "Courbe globale 0 à 1", value: .float(filter.boostAmount), isFunctional: true),
-            RawOption(id: "boostShadowAmount", name: "Boost ombres", note: "Ombres 0 à 2", value: .float(filter.boostShadowAmount), isFunctional: true),
-            RawOption(id: "highlightRecovery", name: "Récupération hautes lumières", note: "Selon fichier et décodeur", value: .bool(filter.isHighlightRecoveryEnabled), isFunctional: filter.isHighlightRecoverySupported),
-            RawOption(id: "gamutMapping", name: "Gamut mapping", note: "Conversion des couleurs", value: .bool(filter.isGamutMappingEnabled), isFunctional: true),
-            RawOption(id: "lensCorrection", name: "Correction optique", note: "Selon métadonnées objectif", value: .bool(filter.isLensCorrectionEnabled), isFunctional: filter.isLensCorrectionSupported),
-            RawOption(id: "luminanceNR", name: "Réduction bruit luminance", note: "0 à 1", value: .float(filter.luminanceNoiseReductionAmount), isFunctional: filter.isLuminanceNoiseReductionSupported),
-            RawOption(id: "colorNR", name: "Réduction bruit couleur", note: "0 à 1", value: .float(filter.colorNoiseReductionAmount), isFunctional: filter.isColorNoiseReductionSupported),
-            RawOption(id: "sharpness", name: "Netteté", note: "0 à 1", value: .float(filter.sharpnessAmount), isFunctional: filter.isSharpnessSupported),
-            RawOption(id: "contrast", name: "Contraste local", note: "0 à 1", value: .float(filter.contrastAmount), isFunctional: filter.isContrastSupported),
-            RawOption(id: "detail", name: "Détail", note: "0 à 3", value: .float(filter.detailAmount), isFunctional: filter.isDetailSupported),
-            RawOption(id: "moire", name: "Réduction moiré", note: "0 à 1", value: .float(filter.moireReductionAmount), isFunctional: filter.isMoireReductionSupported),
-            RawOption(id: "despeckle", name: "Despeckle", note: "0 à 1", value: .float(filter.despeckleAmount), isFunctional: filter.isDespeckleSupported),
-            RawOption(id: "localToneMap", name: "Local tone map", note: "0 à 1", value: .float(filter.localToneMapAmount), isFunctional: filter.isLocalToneMapSupported),
-            RawOption(id: "edr", name: "Extended Dynamic Range", note: "0 à 2", value: .float(filter.extendedDynamicRangeAmount), isFunctional: true),
-            RawOption(id: "neutralChromaticity", name: "Chromaticité neutre", note: "x, y", value: .point(filter.neutralChromaticity), isFunctional: true),
-            RawOption(id: "neutralTemperature", name: "Température", note: "Kelvin", value: .float(filter.neutralTemperature), isFunctional: true),
-            RawOption(id: "neutralTint", name: "Teinte", note: "-150 à 150", value: .float(filter.neutralTint), isFunctional: true)
-        ]
-    }
-
-    private func unavailableOptions() -> [RawOption] {
-        buildOptionNames().map {
-            RawOption(id: $0.id, name: $0.name, note: $0.note, value: .unavailable, isFunctional: false)
+    private func export(file: RawFile, to destination: URL) throws {
+        guard let filter = configuredFilter(for: file, applyingSettings: true),
+              let image = filter.outputImage?.oriented(filter.orientation) else {
+            throw NSError(domain: "RawOptions", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "The RAW decoder did not produce an image."
+            ])
         }
-    }
 
-    private func buildOptionNames() -> [(id: String, name: String, note: String)] {
-        [
-            ("decoderVersion", "Décodeur", "Version Core Image utilisée"),
-            ("scaleFactor", "Échelle", "0 à 1"),
-            ("draftMode", "Mode brouillon", "Décodage plus rapide"),
-            ("exposure", "Exposition", "EV appliqué au RAW"),
-            ("baselineExposure", "Baseline exposure", "Défaut dépendant du fichier"),
-            ("shadowBias", "Shadow bias", "Correction des ombres"),
-            ("boostAmount", "Boost", "Courbe globale 0 à 1"),
-            ("boostShadowAmount", "Boost ombres", "Ombres 0 à 2"),
-            ("highlightRecovery", "Récupération hautes lumières", "Selon fichier et décodeur"),
-            ("gamutMapping", "Gamut mapping", "Conversion des couleurs"),
-            ("lensCorrection", "Correction optique", "Selon métadonnées objectif"),
-            ("luminanceNR", "Réduction bruit luminance", "0 à 1"),
-            ("colorNR", "Réduction bruit couleur", "0 à 1"),
-            ("sharpness", "Netteté", "0 à 1"),
-            ("contrast", "Contraste local", "0 à 1"),
-            ("detail", "Détail", "0 à 3"),
-            ("moire", "Réduction moiré", "0 à 1"),
-            ("despeckle", "Despeckle", "0 à 1"),
-            ("localToneMap", "Local tone map", "0 à 1"),
-            ("edr", "Extended Dynamic Range", "0 à 2"),
-            ("neutralChromaticity", "Chromaticité neutre", "x, y"),
-            ("neutralTemperature", "Température", "Kelvin"),
-            ("neutralTint", "Teinte", "-150 à 150")
-        ]
+        let context = CIContext(options: [.cacheIntermediates: false])
+        let bounds = image.extent.integral
+        guard let cgImage = context.createCGImage(image, from: bounds) else {
+            throw NSError(domain: "RawOptions", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: "The image could not be rendered."
+            ])
+        }
+
+        guard let destinationRef = CGImageDestinationCreateWithURL(destination as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else {
+            throw NSError(domain: "RawOptions", code: 3, userInfo: [
+                NSLocalizedDescriptionKey: "The JPEG destination could not be created."
+            ])
+        }
+
+        CGImageDestinationAddImage(destinationRef, cgImage, [
+            kCGImageDestinationLossyCompressionQuality: 0.95
+        ] as CFDictionary)
+
+        if !CGImageDestinationFinalize(destinationRef) {
+            throw NSError(domain: "RawOptions", code: 4, userInfo: [
+                NSLocalizedDescriptionKey: "The JPEG file could not be written."
+            ])
+        }
     }
 }
 
@@ -253,20 +367,28 @@ struct ContentView: View {
     @StateObject private var model = RawOptionsModel()
 
     var body: some View {
-        HStack(spacing: 0) {
-            DropPane(model: model)
-                .frame(minWidth: 320, idealWidth: 380, maxWidth: 460)
-                .background(Color(nsColor: .windowBackgroundColor))
-
-            Divider()
-
-            OptionsPane(model: model)
-                .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(nsColor: .controlBackgroundColor))
+        GeometryReader { geometry in
+            Group {
+                if geometry.size.width < 780 {
+                    VStack(spacing: 0) {
+                        DropPane(model: model)
+                            .frame(minHeight: 250, maxHeight: 330)
+                        Divider()
+                        OptionsPane(model: model)
+                    }
+                } else {
+                    HStack(spacing: 0) {
+                        DropPane(model: model)
+                            .frame(minWidth: 260, idealWidth: 340, maxWidth: 420)
+                        Divider()
+                        OptionsPane(model: model)
+                    }
+                }
+            }
         }
-        .frame(minWidth: 900, minHeight: 560)
-        .onChange(of: model.mode) { _, _ in model.refreshOptions() }
-        .onChange(of: model.selectedFileID) { _, _ in model.refreshOptions() }
+        .frame(minWidth: 620, minHeight: 560)
+        .onChange(of: model.mode) { _, _ in model.loadDefaultsForSelection() }
+        .onChange(of: model.selectedFileID) { _, _ in model.loadDefaultsForSelection() }
     }
 }
 
@@ -274,14 +396,15 @@ struct DropPane: View {
     @ObservedObject var model: RawOptionsModel
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             dropZone
 
             if model.files.isEmpty {
-                Text("Aucun fichier importé")
+                Spacer(minLength: 0)
+                Text("No files loaded")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                Spacer(minLength: 0)
             } else {
                 List(selection: $model.selectedFileID) {
                     ForEach(model.files) { file in
@@ -289,7 +412,7 @@ struct DropPane: View {
                             Text(file.name)
                                 .font(.system(.body, design: .rounded))
                                 .lineLimit(1)
-                            Text(file.detail)
+                            Text(file.folder)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
@@ -302,29 +425,34 @@ struct DropPane: View {
             }
 
             HStack {
-                Button("Ajouter") { model.chooseFiles() }
-                Button("Retirer") { model.removeSelectedFile() }
+                Button("Add") { model.chooseFiles() }
+                Button("Remove") { model.removeSelectedFile() }
                     .disabled(model.selectedFile == nil)
                 Spacer()
-                Button("Vider") { model.clearFiles() }
+                Button("Clear") { model.clearFiles() }
                     .disabled(model.files.isEmpty)
             }
-            .padding([.horizontal, .bottom], 16)
+            .padding([.horizontal, .bottom], 14)
         }
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var dropZone: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             Image(systemName: "photo.badge.plus")
-                .font(.system(size: 34, weight: .semibold))
+                .font(.system(size: 30, weight: .semibold))
                 .foregroundStyle(model.isDropTargeted ? Color.accentColor : Color.secondary)
-            Text("Glisse les RAW / DNG ici")
+            Text("Drop RAW / DNG files")
                 .font(.headline)
-            Text("Un ou plusieurs fichiers")
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text("One or more photos")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, minHeight: 150)
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 118)
+        .padding(.horizontal, 12)
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(model.isDropTargeted ? Color.accentColor.opacity(0.14) : Color(nsColor: .textBackgroundColor))
@@ -333,7 +461,7 @@ struct DropPane: View {
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(model.isDropTargeted ? Color.accentColor : Color.secondary.opacity(0.28), style: StrokeStyle(lineWidth: 1.5, dash: [7, 5]))
         )
-        .padding(16)
+        .padding(14)
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: $model.isDropTargeted) { providers in
             model.addDroppedProviders(providers)
         }
@@ -347,21 +475,28 @@ struct OptionsPane: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Divider()
-            if model.options.isEmpty {
-                ContentUnavailableView("Aucun RAW sélectionné", systemImage: "slider.horizontal.3", description: Text("Dépose un fichier à gauche pour lire les paramètres par défaut."))
+            if model.selectedFile == nil {
+                ContentUnavailableView("No RAW selected", systemImage: "slider.horizontal.3", description: Text("Drop a RAW file on the left to inspect and edit decoder settings."))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(model.options) { option in
-                    OptionRow(option: option, showValue: model.shouldShowDefaults)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        settingsControls
+                        Raw9CameraSupportView(
+                            rawCameras: model.supportedRaw9Cameras,
+                            dngCameras: model.supportedRaw9DNGCameras
+                        )
+                    }
+                    .padding(18)
                 }
-                .listStyle(.plain)
             }
         }
+        .background(Color(nsColor: .controlBackgroundColor))
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(model.statusText)
                         .font(.headline)
@@ -369,6 +504,7 @@ struct OptionsPane: View {
                         Text(model.metadataText)
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                 }
 
@@ -385,20 +521,60 @@ struct OptionsPane: View {
                 .toggleStyle(.switch)
             }
 
-            HStack(spacing: 8) {
-                ModeBadge(title: "RAW 8", isSelected: model.mode == .raw8)
-                ModeBadge(title: "RAW 9", isSelected: model.mode == .raw9)
+            HStack(spacing: 10) {
+                StatusPill(title: "RAW 8", isSelected: model.mode == .raw8)
+                StatusPill(title: "RAW 9", isSelected: model.mode == .raw9)
+                if !model.support.decoder, model.selectedFile != nil {
+                    Text("Decoder unavailable")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.red)
+                }
                 Spacer()
-                Text(model.shouldShowDefaults ? "Défauts du fichier" : "Valeurs affichées pour le fichier sélectionné")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Button("Reset") { model.resetToDefaults() }
+                    .disabled(model.selectedFile == nil || !model.support.decoder)
+                Button("Export JPEG") { model.exportSelectedFile() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(model.selectedFile == nil || !model.support.decoder)
             }
         }
         .padding(18)
     }
+
+    private var settingsControls: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            SectionTitle("Decoder Settings")
+            ToggleRow("Draft mode", isOn: $model.settings.draftModeEnabled, isEnabled: model.support.decoder)
+            FloatRow("Scale factor", value: $model.settings.scaleFactor, range: 0.1...1, step: 0.05, isEnabled: model.support.decoder)
+
+            SectionTitle("Tone")
+            FloatRow("Exposure", value: $model.settings.exposure, range: -5...5, step: 0.05, isEnabled: model.support.decoder)
+            FloatRow("Baseline exposure", value: $model.settings.baselineExposure, range: -5...5, step: 0.05, isEnabled: model.support.decoder)
+            FloatRow("Shadow bias", value: $model.settings.shadowBias, range: -2...2, step: 0.05, isEnabled: model.support.decoder)
+            FloatRow("Boost", value: $model.settings.boostAmount, range: 0...1, step: 0.01, isEnabled: model.support.decoder)
+            FloatRow("Boost shadows", value: $model.settings.boostShadowAmount, range: 0...2, step: 0.01, isEnabled: model.support.decoder)
+            ToggleRow("Highlight recovery", isOn: $model.settings.highlightRecoveryEnabled, isEnabled: model.support.decoder && model.support.highlightRecovery)
+            ToggleRow("Gamut mapping", isOn: $model.settings.gamutMappingEnabled, isEnabled: model.support.decoder)
+            FloatRow("Extended dynamic range", value: $model.settings.extendedDynamicRangeAmount, range: 0...2, step: 0.05, isEnabled: model.support.decoder)
+
+            SectionTitle("Detail and Noise")
+            ToggleRow("Lens correction", isOn: $model.settings.lensCorrectionEnabled, isEnabled: model.support.decoder && model.support.lensCorrection)
+            FloatRow("Luminance noise reduction", value: $model.settings.luminanceNoiseReductionAmount, range: 0...1, step: 0.01, isEnabled: model.support.decoder && model.support.luminanceNoiseReduction)
+            FloatRow("Color noise reduction", value: $model.settings.colorNoiseReductionAmount, range: 0...1, step: 0.01, isEnabled: model.support.decoder && model.support.colorNoiseReduction)
+            FloatRow("Sharpness", value: $model.settings.sharpnessAmount, range: 0...1, step: 0.01, isEnabled: model.support.decoder && model.support.sharpness)
+            FloatRow("Local contrast", value: $model.settings.contrastAmount, range: 0...1, step: 0.01, isEnabled: model.support.decoder && model.support.contrast)
+            FloatRow("Detail", value: $model.settings.detailAmount, range: 0...3, step: 0.05, isEnabled: model.support.decoder && model.support.detail)
+            FloatRow("Moire reduction", value: $model.settings.moireReductionAmount, range: 0...1, step: 0.01, isEnabled: model.support.decoder && model.support.moireReduction)
+            FloatRow("Despeckle", value: $model.settings.despeckleAmount, range: 0...1, step: 0.01, isEnabled: model.support.decoder && model.support.despeckle)
+            FloatRow("Local tone map", value: $model.settings.localToneMapAmount, range: 0...1, step: 0.01, isEnabled: model.support.decoder && model.support.localToneMap)
+
+            SectionTitle("White Balance")
+            FloatRow("Temperature", value: $model.settings.neutralTemperature, range: 2000...50000, step: 50, isEnabled: model.support.decoder, decimals: 0)
+            FloatRow("Tint", value: $model.settings.neutralTint, range: -150...150, step: 1, isEnabled: model.support.decoder, decimals: 0)
+        }
+    }
 }
 
-struct ModeBadge: View {
+struct StatusPill: View {
     let title: String
     let isSelected: Bool
 
@@ -413,38 +589,118 @@ struct ModeBadge: View {
     }
 }
 
-struct OptionRow: View {
-    let option: RawOption
-    let showValue: Bool
+struct SectionTitle: View {
+    let title: String
+
+    init(_ title: String) {
+        self.title = title
+    }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(option.name)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(option.isFunctional ? .primary : .secondary)
-                Text(option.note)
+        Text(title)
+            .font(.headline)
+            .padding(.top, 6)
+    }
+}
+
+struct ToggleRow: View {
+    let title: String
+    @Binding var isOn: Bool
+    let isEnabled: Bool
+
+    init(_ title: String, isOn: Binding<Bool>, isEnabled: Bool) {
+        self.title = title
+        self._isOn = isOn
+        self.isEnabled = isEnabled
+    }
+
+    var body: some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .disabled(!isEnabled)
+        }
+        .opacity(isEnabled ? 1 : 0.42)
+    }
+}
+
+struct FloatRow: View {
+    let title: String
+    @Binding var value: Float
+    let range: ClosedRange<Float>
+    let step: Float
+    let isEnabled: Bool
+    let decimals: Int
+
+    init(_ title: String, value: Binding<Float>, range: ClosedRange<Float>, step: Float, isEnabled: Bool, decimals: Int = 2) {
+        self.title = title
+        self._value = value
+        self.range = range
+        self.step = step
+        self.isEnabled = isEnabled
+        self.decimals = decimals
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .frame(minWidth: 170, alignment: .leading)
+            Slider(value: Binding(
+                get: { Double(value) },
+                set: { value = Float($0) }
+            ), in: Double(range.lowerBound)...Double(range.upperBound), step: Double(step))
+            .disabled(!isEnabled)
+            Text(String(format: "%.\(decimals)f", value))
+                .font(.system(.body, design: .monospaced))
+                .frame(width: 74, alignment: .trailing)
+        }
+        .opacity(isEnabled ? 1 : 0.42)
+    }
+}
+
+struct Raw9CameraSupportView: View {
+    let rawCameras: [String]
+    let dngCameras: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionTitle("RAW 9 Supported Cameras")
+            Text("\(rawCameras.count) native RAW models, \(dngCameras.count) DNG models reported by Core Image.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            DisclosureGroup("Native RAW models") {
+                CameraList(cameras: rawCameras)
+            }
+            DisclosureGroup("DNG models") {
+                CameraList(cameras: dngCameras)
+            }
+        }
+    }
+}
+
+struct CameraList: View {
+    let cameras: [String]
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 210), alignment: .leading)], alignment: .leading, spacing: 4) {
+            ForEach(cameras, id: \.self) { camera in
+                Text(camera)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-
-            Spacer(minLength: 12)
-
-            Text(showValue || !option.isFunctional ? option.value.display : "Sélection")
-                .font(.system(.body, design: .monospaced))
-                .foregroundStyle(option.isFunctional ? .primary : .secondary)
-                .frame(minWidth: 118, alignment: .trailing)
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .opacity(option.isFunctional ? 1 : 0.42)
+        .padding(.top, 6)
     }
 }
 
 @main
 struct RawOptionsApp: App {
     var body: some Scene {
-        WindowGroup("RAW Options") {
+        WindowGroup("Apple RAW 9 Tester") {
             ContentView()
         }
         .windowStyle(.titleBar)
