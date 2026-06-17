@@ -6,12 +6,13 @@ Core Image's `CIRAWFilter`.
 The app focuses on RAW 8 / RAW 9 decoder behavior:
 
 - drop one or more RAW/DNG files;
+- browse imported files with thumbnails;
 - switch between RAW 8 and RAW 9;
 - load the decoder defaults for the selected file;
 - edit RAW development settings;
 - gray out settings that Core Image reports as unsupported for the current file
   and decoder;
-- export the developed photo as a JPEG;
+- export the developed photo as JPEG or 8-bit PNG;
 - list the camera models currently reported by Core Image as RAW 9 compatible.
 
 ## Requirements
