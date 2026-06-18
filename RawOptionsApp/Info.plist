@@ -5,12 +5,16 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>fr</string>
     <key>CFBundleExecutable</key>
-    <string>RAW Options</string>
+    <string>Apple RAW 9 Tester</string>
     <key>CFBundleIdentifier</key>
     <string>local.raw-options</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
+    <string>Apple RAW 9 Tester</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon.icns</string>
+    <key>CFBundleDisplayName</key>
     <string>Apple RAW 9 Tester</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
