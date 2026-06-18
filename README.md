@@ -29,7 +29,7 @@ zsh build_raw_options_app.sh
 The app is generated at:
 
 ```text
-.build/RAW Options.app
+.build/Apple RAW 9 Tester.app
 ```
 
 ## Samples
