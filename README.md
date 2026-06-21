@@ -32,9 +32,30 @@ The app is generated at:
 .build/Apple RAW 9 Tester.app
 ```
 
+## Standalone release
+
+Create a GitHub-ready ZIP archive with:
+
+```sh
+zsh package_release.sh
+```
+
+The archive and its SHA-256 checksum are generated in `dist/`. The app is
+self-contained and does not require Xcode on the destination Mac.
+
+By default, the app is signed ad hoc. macOS may therefore require
+Control-clicking the app and choosing **Open** the first time. For a
+Developer ID release, provide a signing identity:
+
+```sh
+SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+  zsh package_release.sh
+```
+
 ## Samples
 
-The `Sample raw` folder contains RAW/DNG files for quick local testing.
+Local RAW files can be placed in `Sample raw` for quick testing. This folder is
+ignored by Git so large camera originals are not accidentally committed.
 
 ## RAW 9 Supported Cameras
 
