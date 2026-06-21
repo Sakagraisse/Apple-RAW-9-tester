@@ -3,6 +3,56 @@
 A small macOS SwiftUI app for inspecting and exporting RAW files through
 Core Image's `CIRAWFilter`.
 
+## Disclaimer
+
+> [!IMPORTANT]
+> **Apple RAW 9 Tester requires macOS 27 beta or newer. It will not run on
+> macOS 26 or earlier.**
+
+This is an experimental, unofficial utility for testing Apple Core Image's
+RAW 8 and RAW 9 decoders. It is not affiliated with or endorsed by Apple.
+Decoder behavior, camera compatibility, output quality, and performance may
+change between macOS beta releases.
+
+Keep your original RAW files and do not rely on this app as the only step in a
+production workflow.
+
+## Installation
+
+Download the latest
+[Apple RAW 9 Tester release](https://github.com/Sakagraisse/Apple-RAW-9-tester/releases/latest),
+unzip it, and move `Apple RAW 9 Tester.app` to the Applications folder.
+
+The downloadable app is signed ad hoc but is not notarized with an Apple
+Developer ID. Gatekeeper may therefore block its first launch. Use either of
+the following methods.
+
+### Graphical method
+
+1. Open `Apple RAW 9 Tester.app` once and dismiss the macOS warning.
+2. Open **System Settings → Privacy & Security**.
+3. Scroll down to the security message concerning Apple RAW 9 Tester.
+4. Click **Open Anyway**, authenticate if requested, then confirm **Open**.
+
+This exception is normally required only for the first launch.
+
+### Terminal method
+
+After moving the app to `/Applications`, remove its quarantine attribute:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Apple RAW 9 Tester.app"
+```
+
+You can then open the app normally.
+
+## Findings
+
+_Findings from RAW 8/RAW 9 image-quality, compatibility, and performance tests
+will be documented here._
+
+## Features
+
 The app focuses on RAW 8 / RAW 9 decoder behavior:
 
 - drop one or more RAW/DNG files;
@@ -15,12 +65,12 @@ The app focuses on RAW 8 / RAW 9 decoder behavior:
 - export the developed photo as JPEG or 8-bit PNG;
 - list the camera models currently reported by Core Image as RAW 9 compatible.
 
-## Requirements
+## Building from source
 
-- macOS 27 beta or newer;
-- Xcode 27 or the Xcode 27 command line tools.
+Building requires **macOS 27 beta or newer** and Xcode 27 or the Xcode 27
+command line tools.
 
-## Build
+Run:
 
 ```sh
 zsh build_raw_options_app.sh
@@ -32,7 +82,7 @@ The app is generated at:
 .build/Apple RAW 9 Tester.app
 ```
 
-## Standalone release
+### Packaging a standalone release
 
 Create a GitHub-ready ZIP archive with:
 
@@ -52,7 +102,7 @@ SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
   zsh package_release.sh
 ```
 
-## Samples
+### Local samples
 
 Local RAW files can be placed in `Sample raw` for quick testing. This folder is
 ignored by Git so large camera originals are not accidentally committed.
