@@ -20,22 +20,28 @@ enum ExportFormat: String, CaseIterable, Identifiable {
 
     var contentType: UTType {
         switch self {
-        case .jpeg: return .jpeg
-        case .png8: return .png
+        case .jpeg:
+            return .jpeg
+        case .png8:
+            return .png
         }
     }
 
     var fileExtension: String {
         switch self {
-        case .jpeg: return "jpg"
-        case .png8: return "png"
+        case .jpeg:
+            return "jpg"
+        case .png8:
+            return "png"
         }
     }
 
     var filenameToken: String {
         switch self {
-        case .jpeg: return "jpeg"
-        case .png8: return "png8"
+        case .jpeg:
+            return "jpeg"
+        case .png8:
+            return "png8"
         }
     }
 }
@@ -144,7 +150,9 @@ final class RawOptionsModel: ObservableObject {
             accepted = true
             provider.loadObject(ofClass: NSURL.self) { [weak self] item, _ in
                 guard let url = item as? URL else { return }
-                DispatchQueue.main.async { self?.addURL(url) }
+                DispatchQueue.main.async {
+                    self?.addURL(url)
+                }
             }
         }
         return accepted
@@ -241,7 +249,9 @@ final class RawOptionsModel: ObservableObject {
             statusText = "Ignored unsupported file: \(standardized.lastPathComponent)"
             return
         }
-        guard !files.contains(where: { $0.url == standardized }) else { return }
+        guard !files.contains(where: { $0.url == standardized }) else {
+            return
+        }
 
         let file = RawFile(url: standardized)
         files.append(file)
@@ -255,10 +265,14 @@ final class RawOptionsModel: ObservableObject {
 
     private func decoderVersion(for file: RawFile) -> CIRAWDecoderVersion {
         switch (mode, file.isDNG) {
-        case (.raw8, true): return .version8DNG
-        case (.raw8, false): return .version8
-        case (.raw9, true): return .version9DNG
-        case (.raw9, false): return .version9
+        case (.raw8, true):
+            return .version8DNG
+        case (.raw8, false):
+            return .version8
+        case (.raw9, true):
+            return .version9DNG
+        case (.raw9, false):
+            return .version9
         }
     }
 
@@ -270,6 +284,7 @@ final class RawOptionsModel: ObservableObject {
         }
         filter.scaleFactor = applyingSettings ? settings.scaleFactor : 1
         filter.isDraftModeEnabled = applyingSettings ? settings.draftModeEnabled : false
+
         if applyingSettings {
             apply(settings: settings, support: support, to: filter)
         }
@@ -287,16 +302,36 @@ final class RawOptionsModel: ObservableObject {
         filter.neutralTemperature = settings.neutralTemperature
         filter.neutralTint = settings.neutralTint
 
-        if support.highlightRecovery { filter.isHighlightRecoveryEnabled = settings.highlightRecoveryEnabled }
-        if support.lensCorrection { filter.isLensCorrectionEnabled = settings.lensCorrectionEnabled }
-        if support.luminanceNoiseReduction { filter.luminanceNoiseReductionAmount = settings.luminanceNoiseReductionAmount }
-        if support.colorNoiseReduction { filter.colorNoiseReductionAmount = settings.colorNoiseReductionAmount }
-        if support.sharpness { filter.sharpnessAmount = settings.sharpnessAmount }
-        if support.contrast { filter.contrastAmount = settings.contrastAmount }
-        if support.detail { filter.detailAmount = settings.detailAmount }
-        if support.moireReduction { filter.moireReductionAmount = settings.moireReductionAmount }
-        if support.despeckle { filter.despeckleAmount = settings.despeckleAmount }
-        if support.localToneMap { filter.localToneMapAmount = settings.localToneMapAmount }
+        if support.highlightRecovery {
+            filter.isHighlightRecoveryEnabled = settings.highlightRecoveryEnabled
+        }
+        if support.lensCorrection {
+            filter.isLensCorrectionEnabled = settings.lensCorrectionEnabled
+        }
+        if support.luminanceNoiseReduction {
+            filter.luminanceNoiseReductionAmount = settings.luminanceNoiseReductionAmount
+        }
+        if support.colorNoiseReduction {
+            filter.colorNoiseReductionAmount = settings.colorNoiseReductionAmount
+        }
+        if support.sharpness {
+            filter.sharpnessAmount = settings.sharpnessAmount
+        }
+        if support.contrast {
+            filter.contrastAmount = settings.contrastAmount
+        }
+        if support.detail {
+            filter.detailAmount = settings.detailAmount
+        }
+        if support.moireReduction {
+            filter.moireReductionAmount = settings.moireReductionAmount
+        }
+        if support.despeckle {
+            filter.despeckleAmount = settings.despeckleAmount
+        }
+        if support.localToneMap {
+            filter.localToneMapAmount = settings.localToneMapAmount
+        }
     }
 
     private func supportSummary(for filter: CIRAWFilter) -> RawSupport {
@@ -319,7 +354,9 @@ final class RawOptionsModel: ObservableObject {
     private func metadataSummary(for filter: CIRAWFilter, file: RawFile) -> String {
         let tiff = filter.properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any]
         let model = tiff?[kCGImagePropertyTIFFModel as String] as? String ?? "Unknown camera"
-        return "\(file.name) · \(model) · \(Int(filter.nativeSize.width)) x \(Int(filter.nativeSize.height))"
+        let width = Int(filter.nativeSize.width)
+        let height = Int(filter.nativeSize.height)
+        return "\(file.name) · \(model) · \(width) x \(height)"
     }
 
     private func loadThumbnail(for file: RawFile) {
@@ -329,10 +366,13 @@ final class RawOptionsModel: ObservableObject {
             scale: NSScreen.main?.backingScaleFactor ?? 2,
             representationTypes: [.thumbnail, .icon]
         )
+
         QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { [weak self] representation, _ in
             let thumbnail = representation?.nsImage ?? self?.makeCoreImageThumbnail(for: file.url)
             guard let thumbnail else { return }
-            DispatchQueue.main.async { self?.thumbnails[file.id] = thumbnail }
+            DispatchQueue.main.async {
+                self?.thumbnails[file.id] = thumbnail
+            }
         }
     }
 
@@ -340,51 +380,93 @@ final class RawOptionsModel: ObservableObject {
         guard let filter = CIRAWFilter(imageURL: url) else { return nil }
         filter.scaleFactor = 0.04
         filter.isDraftModeEnabled = true
-        guard let image = filter.outputImage?.oriented(filter.orientation) else { return nil }
+
+        let image = filter.outputImage?.oriented(filter.orientation)
+        guard let image else { return nil }
 
         let context = CIContext(options: [.cacheIntermediates: false])
         let extent = image.extent.integral
         let maxSide: CGFloat = 96
         let scale = min(maxSide / max(extent.width, extent.height), 1)
         let thumbnailImage = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-        let bounds = thumbnailImage.extent.integral
-        let width = Int(bounds.width)
-        let height = Int(bounds.height)
+        let thumbnailBounds = thumbnailImage.extent.integral
+
+        let width = Int(thumbnailBounds.width)
+        let height = Int(thumbnailBounds.height)
         let rowBytes = width * 4
         var pixels = Data(count: rowBytes * height)
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
 
         pixels.withUnsafeMutableBytes { buffer in
-            context.render(thumbnailImage, toBitmap: buffer.baseAddress!, rowBytes: rowBytes, bounds: bounds, format: .RGBA8, colorSpace: colorSpace)
+            context.render(
+                thumbnailImage,
+                toBitmap: buffer.baseAddress!,
+                rowBytes: rowBytes,
+                bounds: thumbnailBounds,
+                format: .RGBA8,
+                colorSpace: colorSpace
+            )
         }
+
         guard let provider = CGDataProvider(data: pixels as CFData),
-              let cgImage = CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: rowBytes, space: colorSpace, bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue), provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent) else { return nil }
+              let cgImage = CGImage(
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bitsPerPixel: 32,
+                bytesPerRow: rowBytes,
+                space: colorSpace,
+                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                provider: provider,
+                decode: nil,
+                shouldInterpolate: true,
+                intent: .defaultIntent
+              ) else {
+            return nil
+        }
         return NSImage(cgImage: cgImage, size: NSSize(width: width, height: height))
     }
 
     private func export(file: RawFile, to destination: URL, format: ExportFormat) throws {
         guard let filter = configuredFilter(for: file, applyingSettings: true),
               let image = filter.outputImage?.oriented(filter.orientation) else {
-            throw NSError(domain: "RawOptions", code: 1, userInfo: [NSLocalizedDescriptionKey: "The RAW decoder did not produce an image."])
+            throw NSError(domain: "RawOptions", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "The RAW decoder did not produce an image."
+            ])
         }
+
         let context = CIContext(options: [.cacheIntermediates: false])
         let bounds = image.extent.integral
+
         switch format {
-        case .jpeg: try exportJPEG(image: image, bounds: bounds, context: context, to: destination)
-        case .png8: try exportPNG8(image: image, bounds: bounds, context: context, to: destination)
+        case .jpeg:
+            try exportJPEG(image: image, bounds: bounds, context: context, to: destination)
+        case .png8:
+            try exportPNG8(image: image, bounds: bounds, context: context, to: destination)
         }
     }
 
     private func exportJPEG(image: CIImage, bounds: CGRect, context: CIContext, to destination: URL) throws {
         guard let cgImage = context.createCGImage(image, from: bounds) else {
-            throw NSError(domain: "RawOptions", code: 2, userInfo: [NSLocalizedDescriptionKey: "The image could not be rendered."])
+            throw NSError(domain: "RawOptions", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: "The image could not be rendered."
+            ])
         }
+
         guard let destinationRef = CGImageDestinationCreateWithURL(destination as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else {
-            throw NSError(domain: "RawOptions", code: 3, userInfo: [NSLocalizedDescriptionKey: "The JPEG destination could not be created."])
+            throw NSError(domain: "RawOptions", code: 3, userInfo: [
+                NSLocalizedDescriptionKey: "The JPEG destination could not be created."
+            ])
         }
-        CGImageDestinationAddImage(destinationRef, cgImage, [kCGImageDestinationLossyCompressionQuality: 0.95] as CFDictionary)
+
+        CGImageDestinationAddImage(destinationRef, cgImage, [
+            kCGImageDestinationLossyCompressionQuality: 0.95
+        ] as CFDictionary)
+
         if !CGImageDestinationFinalize(destinationRef) {
-            throw NSError(domain: "RawOptions", code: 4, userInfo: [NSLocalizedDescriptionKey: "The JPEG file could not be written."])
+            throw NSError(domain: "RawOptions", code: 4, userInfo: [
+                NSLocalizedDescriptionKey: "The JPEG file could not be written."
+            ])
         }
     }
 
@@ -392,24 +474,56 @@ final class RawOptionsModel: ObservableObject {
         let width = Int(bounds.width)
         let height = Int(bounds.height)
         guard width > 0, height > 0 else {
-            throw NSError(domain: "RawOptions", code: 5, userInfo: [NSLocalizedDescriptionKey: "The image has an empty extent."])
+            throw NSError(domain: "RawOptions", code: 5, userInfo: [
+                NSLocalizedDescriptionKey: "The image has an empty extent."
+            ])
         }
+
         let rowBytes = width * 4
         var pixels = Data(count: rowBytes * height)
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+
         pixels.withUnsafeMutableBytes { buffer in
-            context.render(image, toBitmap: buffer.baseAddress!, rowBytes: rowBytes, bounds: bounds, format: .RGBA8, colorSpace: colorSpace)
+            context.render(
+                image,
+                toBitmap: buffer.baseAddress!,
+                rowBytes: rowBytes,
+                bounds: bounds,
+                format: .RGBA8,
+                colorSpace: colorSpace
+            )
         }
+
         guard let provider = CGDataProvider(data: pixels as CFData),
-              let cgImage = CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: rowBytes, space: colorSpace, bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue), provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent) else {
-            throw NSError(domain: "RawOptions", code: 6, userInfo: [NSLocalizedDescriptionKey: "The 8-bit PNG image could not be created."])
+              let cgImage = CGImage(
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bitsPerPixel: 32,
+                bytesPerRow: rowBytes,
+                space: colorSpace,
+                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                provider: provider,
+                decode: nil,
+                shouldInterpolate: true,
+                intent: .defaultIntent
+              ) else {
+            throw NSError(domain: "RawOptions", code: 6, userInfo: [
+                NSLocalizedDescriptionKey: "The 8-bit PNG image could not be created."
+            ])
         }
+
         guard let destinationRef = CGImageDestinationCreateWithURL(destination as CFURL, UTType.png.identifier as CFString, 1, nil) else {
-            throw NSError(domain: "RawOptions", code: 7, userInfo: [NSLocalizedDescriptionKey: "The PNG destination could not be created."])
+            throw NSError(domain: "RawOptions", code: 7, userInfo: [
+                NSLocalizedDescriptionKey: "The PNG destination could not be created."
+            ])
         }
         CGImageDestinationAddImage(destinationRef, cgImage, nil)
+
         if !CGImageDestinationFinalize(destinationRef) {
-            throw NSError(domain: "RawOptions", code: 8, userInfo: [NSLocalizedDescriptionKey: "The PNG file could not be written."])
+            throw NSError(domain: "RawOptions", code: 8, userInfo: [
+                NSLocalizedDescriptionKey: "The PNG file could not be written."
+            ])
         }
     }
 }
@@ -422,13 +536,15 @@ struct ContentView: View {
             Group {
                 if geometry.size.width < 780 {
                     VStack(spacing: 0) {
-                        DropPane(model: model).frame(minHeight: 250, maxHeight: 330)
+                        DropPane(model: model)
+                            .frame(minHeight: 250, maxHeight: 330)
                         Divider()
                         OptionsPane(model: model)
                     }
                 } else {
                     HStack(spacing: 0) {
-                        DropPane(model: model).frame(minWidth: 260, idealWidth: 340, maxWidth: 420)
+                        DropPane(model: model)
+                            .frame(minWidth: 260, idealWidth: 340, maxWidth: 420)
                         Divider()
                         OptionsPane(model: model)
                     }
@@ -447,18 +563,27 @@ struct DropPane: View {
     var body: some View {
         VStack(spacing: 12) {
             dropZone
+
             if model.files.isEmpty {
                 Spacer(minLength: 0)
-                Text("No files loaded").font(.callout).foregroundStyle(.secondary)
+                Text("No files loaded")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             } else {
                 List(selection: $model.selectedFileID) {
                     ForEach(model.files) { file in
                         HStack(spacing: 10) {
                             ThumbnailView(image: model.thumbnail(for: file))
+
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(file.name).font(.system(.body, design: .rounded)).lineLimit(1)
-                                Text(file.folder).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                Text(file.name)
+                                    .font(.system(.body, design: .rounded))
+                                    .lineLimit(1)
+                                Text(file.folder)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
                             }
                         }
                         .padding(.vertical, 4)
@@ -467,11 +592,14 @@ struct DropPane: View {
                 }
                 .listStyle(.sidebar)
             }
+
             HStack {
                 Button("Add") { model.chooseFiles() }
-                Button("Remove") { model.removeSelectedFile() }.disabled(model.selectedFile == nil)
+                Button("Remove") { model.removeSelectedFile() }
+                    .disabled(model.selectedFile == nil)
                 Spacer()
-                Button("Clear") { model.clearFiles() }.disabled(model.files.isEmpty)
+                Button("Clear") { model.clearFiles() }
+                    .disabled(model.files.isEmpty)
             }
             .padding([.horizontal, .bottom], 14)
         }
@@ -480,31 +608,60 @@ struct DropPane: View {
 
     private var dropZone: some View {
         VStack(spacing: 8) {
-            Image(systemName: "photo.badge.plus").font(.system(size: 30, weight: .semibold)).foregroundStyle(model.isDropTargeted ? Color.accentColor : Color.secondary)
-            Text("Drop RAW / DNG files").font(.headline).lineLimit(1).minimumScaleFactor(0.8)
-            Text("One or more photos").font(.caption).foregroundStyle(.secondary)
+            Image(systemName: "photo.badge.plus")
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(model.isDropTargeted ? Color.accentColor : Color.secondary)
+            Text("Drop RAW / DNG files")
+                .font(.headline)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text("One or more photos")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity).frame(minHeight: 118).padding(.horizontal, 12)
-        .background(RoundedRectangle(cornerRadius: 8).fill(model.isDropTargeted ? Color.accentColor.opacity(0.14) : Color(nsColor: .textBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(model.isDropTargeted ? Color.accentColor : Color.secondary.opacity(0.28), style: StrokeStyle(lineWidth: 1.5, dash: [7, 5])))
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 118)
+        .padding(.horizontal, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(model.isDropTargeted ? Color.accentColor.opacity(0.14) : Color(nsColor: .textBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(model.isDropTargeted ? Color.accentColor : Color.secondary.opacity(0.28), style: StrokeStyle(lineWidth: 1.5, dash: [7, 5]))
+        )
         .padding(14)
-        .onDrop(of: [UTType.fileURL.identifier], isTargeted: $model.isDropTargeted) { model.addDroppedProviders($0) }
+        .onDrop(of: [UTType.fileURL.identifier], isTargeted: $model.isDropTargeted) { providers in
+            model.addDroppedProviders(providers)
+        }
     }
 }
 
 struct ThumbnailView: View {
     let image: NSImage?
+
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.12))
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.secondary.opacity(0.12))
+
             if let image {
-                Image(nsImage: image).resizable().scaledToFill().frame(width: 46, height: 46).clipShape(RoundedRectangle(cornerRadius: 6))
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 46, height: 46)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
             } else {
-                Image(systemName: "photo").font(.system(size: 18, weight: .medium)).foregroundStyle(.secondary)
+                Image(systemName: "photo")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.secondary)
             }
         }
         .frame(width: 46, height: 46)
-        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.secondary.opacity(0.18)))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(Color.secondary.opacity(0.18))
+        )
     }
 }
 
@@ -516,14 +673,21 @@ struct OptionsPane: View {
             header
             Divider()
             if model.mode == .raw9, model.selectedFile != nil, !model.support.decoder {
-                Raw9WarningView { model.mode = .raw8 }
+                Raw9WarningView {
+                    model.mode = .raw8
+                }
                 Divider()
             }
             if model.selectedFile == nil {
                 ContentUnavailableView("No RAW selected", systemImage: "slider.horizontal.3", description: Text("Drop a RAW file on the left to inspect and edit decoder settings."))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView { settingsControls.padding(18) }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        settingsControls
+                    }
+                    .padding(18)
+                }
             }
         }
         .background(Color(nsColor: .controlBackgroundColor))
@@ -533,23 +697,47 @@ struct OptionsPane: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(model.statusText).font(.headline)
-                    if !model.metadataText.isEmpty { Text(model.metadataText).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                    Text(model.statusText)
+                        .font(.headline)
+                    if !model.metadataText.isEmpty {
+                        Text(model.metadataText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
+
                 Spacer()
-                Toggle(isOn: Binding(get: { model.mode == .raw9 }, set: { model.mode = $0 ? .raw9 : .raw8 })) {
-                    Text(model.mode.rawValue).font(.system(.body, design: .rounded).weight(.semibold)).frame(width: 62, alignment: .trailing)
+
+                Toggle(isOn: Binding(
+                    get: { model.mode == .raw9 },
+                    set: { model.mode = $0 ? .raw9 : .raw8 }
+                )) {
+                    Text(model.mode.rawValue)
+                        .font(.system(.body, design: .rounded).weight(.semibold))
+                        .frame(width: 62, alignment: .trailing)
                 }
                 .toggleStyle(.switch)
             }
+
             HStack(spacing: 10) {
                 StatusPill(title: "RAW 8", isSelected: model.mode == .raw8)
                 StatusPill(title: "RAW 9", isSelected: model.mode == .raw9)
                 Spacer()
-                Picker("", selection: $model.exportFormat) { ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) } }
-                    .pickerStyle(.menu).frame(width: 112).disabled(model.selectedFile == nil || !model.support.decoder)
-                Button("Reset") { model.resetToDefaults() }.disabled(model.selectedFile == nil || !model.support.decoder)
-                Button("Export") { model.exportSelectedFile() }.buttonStyle(.borderedProminent).disabled(model.selectedFile == nil || !model.support.decoder)
+                Picker("", selection: $model.exportFormat) {
+                    ForEach(ExportFormat.allCases) { format in
+                        Text(format.rawValue).tag(format)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 112)
+                .disabled(model.selectedFile == nil || !model.support.decoder)
+
+                Button("Reset") { model.resetToDefaults() }
+                    .disabled(model.selectedFile == nil || !model.support.decoder)
+                Button("Export") { model.exportSelectedFile() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(model.selectedFile == nil || !model.support.decoder)
             }
         }
         .padding(18)
@@ -557,10 +745,14 @@ struct OptionsPane: View {
 
     private var settingsControls: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Available means Core Image accepts the setting for this file and decoder. It does not guarantee a visible pixel difference.").font(.caption).foregroundStyle(.secondary)
+            Text("Available means Core Image accepts the setting for this file and decoder. It does not guarantee a visible pixel difference.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             SectionTitle("Decoder Settings")
             ToggleRow("Draft mode", isOn: $model.settings.draftModeEnabled, isEnabled: model.support.decoder)
             FloatRow("Scale factor", value: $model.settings.scaleFactor, range: 0.1...1, step: 0.05, isEnabled: model.support.decoder)
+
             SectionTitle("Tone")
             FloatRow("Exposure", value: $model.settings.exposure, range: -5...5, step: 0.05, isEnabled: model.support.decoder)
             FloatRow("Baseline exposure", value: $model.settings.baselineExposure, range: -5...5, step: 0.05, isEnabled: model.support.decoder)
@@ -570,6 +762,7 @@ struct OptionsPane: View {
             ToggleRow("Highlight recovery", isOn: $model.settings.highlightRecoveryEnabled, isEnabled: model.support.decoder && model.support.highlightRecovery)
             ToggleRow("Gamut mapping", isOn: $model.settings.gamutMappingEnabled, isEnabled: model.support.decoder)
             FloatRow("Extended dynamic range", value: $model.settings.extendedDynamicRangeAmount, range: 0...2, step: 0.05, isEnabled: model.support.decoder)
+
             SectionTitle("Detail and Noise")
             ToggleRow("Lens correction", isOn: $model.settings.lensCorrectionEnabled, isEnabled: model.support.decoder && model.support.lensCorrection)
             FloatRow("Luminance noise reduction", value: $model.settings.luminanceNoiseReductionAmount, range: 0...1, step: 0.01, isEnabled: model.support.decoder && model.support.luminanceNoiseReduction)
@@ -580,6 +773,7 @@ struct OptionsPane: View {
             FloatRow("Moire reduction", value: $model.settings.moireReductionAmount, range: 0...1, step: 0.01, isEnabled: model.support.decoder && model.support.moireReduction)
             FloatRow("Despeckle", value: $model.settings.despeckleAmount, range: 0...1, step: 0.01, isEnabled: model.support.decoder && model.support.despeckle)
             FloatRow("Local tone map", value: $model.settings.localToneMapAmount, range: 0...1, step: 0.01, isEnabled: model.support.decoder && model.support.localToneMap)
+
             SectionTitle("White Balance")
             FloatRow("Temperature", value: $model.settings.neutralTemperature, range: 2000...50000, step: 50, isEnabled: model.support.decoder, decimals: 0)
             FloatRow("Tint", value: $model.settings.neutralTint, range: -150...150, step: 1, isEnabled: model.support.decoder, decimals: 0)
@@ -589,47 +783,79 @@ struct OptionsPane: View {
 
 struct Raw9WarningView: View {
     let switchToRaw8: () -> Void
+
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill").font(.title3).foregroundStyle(.orange)
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.title3)
+                .foregroundStyle(.orange)
+
             VStack(alignment: .leading, spacing: 3) {
-                Text("RAW 9 is not available for this camera or file.").font(.callout.weight(.semibold))
-                Text("The current RAW cannot be processed with the RAW 9 decoder on this system.").font(.caption).foregroundStyle(.secondary)
+                Text("RAW 9 is not available for this camera or file.")
+                    .font(.callout.weight(.semibold))
+                Text("The current RAW cannot be processed with the RAW 9 decoder on this system.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
+
             Spacer()
+
             Button("Use RAW 8", action: switchToRaw8)
         }
-        .padding(.horizontal, 18).padding(.vertical, 12).background(Color.orange.opacity(0.10))
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+        .background(Color.orange.opacity(0.10))
     }
 }
 
 struct StatusPill: View {
     let title: String
     let isSelected: Bool
+
     var body: some View {
-        Text(title).font(.caption.weight(.semibold)).padding(.horizontal, 8).padding(.vertical, 4)
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
             .background(isSelected ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.12))
-            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary).clipShape(RoundedRectangle(cornerRadius: 6))
+            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }
 
 struct SectionTitle: View {
     let title: String
-    init(_ title: String) { self.title = title }
-    var body: some View { Text(title).font(.headline).padding(.top, 6) }
+
+    init(_ title: String) {
+        self.title = title
+    }
+
+    var body: some View {
+        Text(title)
+            .font(.headline)
+            .padding(.top, 6)
+    }
 }
 
 struct ToggleRow: View {
     let title: String
     @Binding var isOn: Bool
     let isEnabled: Bool
-    init(_ title: String, isOn: Binding<Bool>, isEnabled: Bool) { self.title = title; self._isOn = isOn; self.isEnabled = isEnabled }
+
+    init(_ title: String, isOn: Binding<Bool>, isEnabled: Bool) {
+        self.title = title
+        self._isOn = isOn
+        self.isEnabled = isEnabled
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             Text(title)
             Spacer()
             AdjustmentStateBadge(isApplied: isEnabled)
-            Toggle("", isOn: $isOn).labelsHidden().disabled(!isEnabled)
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .disabled(!isEnabled)
         }
         .opacity(isEnabled ? 1 : 0.42)
     }
@@ -644,16 +870,35 @@ struct FloatRow: View {
     let decimals: Int
 
     init(_ title: String, value: Binding<Float>, range: ClosedRange<Float>, step: Float, isEnabled: Bool, decimals: Int = 2) {
-        self.title = title; self._value = value; self.range = range; self.step = step; self.isEnabled = isEnabled; self.decimals = decimals
+        self.title = title
+        self._value = value
+        self.range = range
+        self.step = step
+        self.isEnabled = isEnabled
+        self.decimals = decimals
     }
 
     var body: some View {
         HStack(spacing: 12) {
-            Text(title).frame(minWidth: 170, alignment: .leading)
-            Slider(value: Binding(get: { Double(value) }, set: { value = min(max(Float($0), range.lowerBound), range.upperBound) }), in: Double(range.lowerBound)...Double(range.upperBound), step: Double(step)).disabled(!isEnabled)
+            Text(title)
+                .frame(minWidth: 170, alignment: .leading)
+            Slider(value: Binding(
+                get: { Double(value) },
+                set: { value = min(max(Float($0), range.lowerBound), range.upperBound) }
+            ), in: Double(range.lowerBound)...Double(range.upperBound), step: Double(step))
+            .disabled(!isEnabled)
+
             AdjustmentStateBadge(isApplied: isEnabled)
-            TextField("", value: Binding(get: { Double(value) }, set: { value = min(max(Float($0), range.lowerBound), range.upperBound) }), formatter: numberFormatter)
-                .textFieldStyle(.roundedBorder).font(.system(.body, design: .monospaced)).multilineTextAlignment(.trailing).frame(width: 82).disabled(!isEnabled)
+
+            TextField("", value: Binding(
+                get: { Double(value) },
+                set: { value = min(max(Float($0), range.lowerBound), range.upperBound) }
+            ), formatter: numberFormatter)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(.body, design: .monospaced))
+                .multilineTextAlignment(.trailing)
+                .frame(width: 82)
+                .disabled(!isEnabled)
         }
         .opacity(isEnabled ? 1 : 0.42)
     }
@@ -673,24 +918,38 @@ struct FloatRow: View {
 
 struct AdjustmentStateBadge: View {
     let isApplied: Bool
+
     var body: some View {
-        Text(isApplied ? "Available" : "Unavailable").font(.caption2.weight(.semibold))
-            .foregroundStyle(isApplied ? Color.green : Color.secondary).frame(width: 72, alignment: .trailing)
-            .help(isApplied ? "Core Image reports that this setting is available in the selected decoder pipeline." : "Core Image reports that this setting is unavailable in the selected decoder pipeline.")
+        Text(isApplied ? "Available" : "Unavailable")
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(isApplied ? Color.green : Color.secondary)
+            .frame(width: 72, alignment: .trailing)
+            .help(
+                isApplied
+                    ? "Core Image reports that this setting is available in the selected decoder pipeline."
+                    : "Core Image reports that this setting is unavailable in the selected decoder pipeline."
+            )
     }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns") ?? Bundle.main.url(forResource: "AppIcon", withExtension: "png")
-        if let iconURL, let icon = NSImage(contentsOf: iconURL) { NSApplication.shared.applicationIconImage = icon }
+        let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns")
+            ?? Bundle.main.url(forResource: "AppIcon", withExtension: "png")
+        if let iconURL, let icon = NSImage(contentsOf: iconURL) {
+            NSApplication.shared.applicationIconImage = icon
+        }
     }
 }
 
 @main
 struct RawOptionsApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     var body: some Scene {
-        WindowGroup("Apple RAW 9 Tester") { ContentView() }.windowStyle(.titleBar)
+        WindowGroup("Apple RAW 9 Tester") {
+            ContentView()
+        }
+        .windowStyle(.titleBar)
     }
 }

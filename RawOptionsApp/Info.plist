@@ -7,7 +7,7 @@
     <key>CFBundleExecutable</key>
     <string>Apple RAW 9 Tester</string>
     <key>CFBundleIdentifier</key>
-    <string>local.raw-options</string>
+    <string>com.sakagraisse.apple-raw-9-tester</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
@@ -19,7 +19,7 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>1.0.0</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
