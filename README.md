@@ -69,7 +69,9 @@ Each set contains:
 - a Lightroom AI Denoise JPEG at 100.
 
 Except for the stated denoising values, the other Lightroom settings were left
-at their defaults. The Apple RAW 8 and RAW 9 outputs use the decoder defaults
+at their defaults. Exposure was increased by either +1 or +2 EV, depending on
+the image, because the RAW files were intentionally underexposed to preserve
+the highlights. The Apple RAW 8 and RAW 9 outputs use the decoder defaults
 reported for each image.
 
 ### Initial image-quality impression
@@ -77,14 +79,14 @@ reported for each image.
 For these three samples, the subjective ranking is:
 
 ```text
-Apple RAW 8 < Lightroom non-AI < Apple RAW 9 ≈ Lightroom AI 100 < Lightroom AI 50
+Apple RAW 8 < Lightroom non-AI < Apple RAW 9 < Lightroom AI 100 < Lightroom AI 50
 ```
 
-Apple RAW 9 appears broadly comparable to Lightroom AI Denoise at 100, while
-avoiding some artifacts visible in the Lightroom result. Lightroom AI Denoise
-at 50 currently gives the most balanced result to my eyes. This ranking is
-based on the default or stated settings; all of these results could be improved
-or changed through manual denoising and sharpening adjustments.
+Lightroom AI Denoise at 100 produces a better overall result than Apple RAW 9
+in these samples, while Lightroom AI Denoise at 50 currently gives the most
+balanced result to my eyes. This ranking is based on the default or stated
+settings; all of these results could be improved or changed through manual
+denoising and sharpening adjustments.
 
 ### Decoder behavior
 
