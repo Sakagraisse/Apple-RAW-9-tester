@@ -48,8 +48,80 @@ You can then open the app normally.
 
 ## Findings
 
-_Findings from RAW 8/RAW 9 image-quality, compatibility, and performance tests
-will be documented here._
+These are preliminary visual findings from a small sample set, not a controlled
+benchmark. Results may vary with the camera, ISO, exposure, subject, macOS beta,
+and development settings. The camera models currently reported as RAW 9
+compatible are listed in the [RAW 9 Supported Cameras](#raw-9-supported-cameras)
+section near the end of this README.
+
+### Sample comparisons
+
+Three comparison sets are available in this
+[Google Drive folder](https://drive.google.com/drive/folders/1WbI23_YMFsOyB7Q6dzllVdF2xnEdF732?usp=share_link).
+Each set contains:
+
+- the original Sony `.ARW` file;
+- an Apple RAW 8 JPEG;
+- an Apple RAW 9 JPEG;
+- a Lightroom JPEG using conventional, non-AI noise reduction with luminance
+  set to 30;
+- a Lightroom AI Denoise JPEG at 50;
+- a Lightroom AI Denoise JPEG at 100.
+
+Except for the stated denoising values, the other Lightroom settings were left
+at their defaults. The Apple RAW 8 and RAW 9 outputs use the decoder defaults
+reported for each image.
+
+### Initial image-quality impression
+
+For these three samples, the subjective ranking is:
+
+```text
+Apple RAW 8 < Lightroom non-AI < Apple RAW 9 ≈ Lightroom AI 100 < Lightroom AI 50
+```
+
+Apple RAW 9 appears broadly comparable to Lightroom AI Denoise at 100, while
+avoiding some artifacts visible in the Lightroom result. Lightroom AI Denoise
+at 50 currently gives the most balanced result to my eyes. This ranking is
+based on the default or stated settings; all of these results could be improved
+or changed through manual denoising and sharpening adjustments.
+
+### Decoder behavior
+
+Apple changes the RAW development defaults according to image metadata. In
+particular, higher-ISO images receive stronger default noise reduction, so the
+numerical settings should not be interpreted independently of the source file.
+
+RAW 9 must be requested explicitly through Core Image. Otherwise,
+`CIRAWFilter` continues to use RAW 8 by default.
+
+The currently limited camera-compatibility list suggests that Apple may still
+be translating or calibrating existing RAW 8 camera profiles for the RAW 9
+pipeline. This is an observation rather than confirmed information about
+Apple's implementation.
+
+Unsupported proprietary RAW files can be converted to DNG with Adobe DNG
+Converter and then processed through RAW 9. However, conversion may discard or
+alter some camera-specific information, including data used for optical
+corrections, so native RAW 9 support remains preferable.
+
+### Performance
+
+In the current macOS beta, RAW 9 processing has been observed to take up to
+approximately eight times as long as RAW 8. RAW 9 is clearly slower in these
+initial tests, but the measured difference may partly result from the specific
+processing and export code used by this repository rather than the decoder
+alone. More rigorous performance conclusions will require further testing and
+future macOS releases.
+
+### What this could enable
+
+Because RAW 9 is exposed through the system Core Image framework, a developer
+could theoretically build a free macOS preprocessing utility in the spirit of
+Topaz Photo AI or DxO PureRAW, or integrate the same RAW 9 development and
+denoising pipeline directly into a photo-editing application. The practical
+limits will depend on output quality across more cameras, processing speed,
+metadata preservation, and the behavior of future macOS releases.
 
 ## Features
 
